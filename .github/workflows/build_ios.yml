@@ -16,18 +16,38 @@ jobs:
         with:
           channel: 'stable'
           architecture: x64
-
+      
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Fix Signing Settings (The Magic Step)
+        run: |
+          # 1. Disable Automatic Signing
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
+          
+          # 2. Remove Development Team requirement
+          sed -i '' 's/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          
+          # 3. Force Code Signing Allowed to NO
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
+          
+          # 4. Remove Code Signing Required
+          sed -i '' 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
+
       - name: Build iOS (No Codesign)
         run: |
+          # Build the app with explicit signing disabled
+          flutter build ios --release --no-codesign --config-only
+          
+          # Re-run build to ensure artifacts are generated (sometimes needed for CI)
           flutter build ios --release --no-codesign
 
       - name: Create IPA Structure
         run: |
           mkdir Payload
+          # Move the compiled app into the Payload folder
           mv build/ios/iphoneos/Runner.app Payload
+          # Zip it up into an IPA
           zip -r app-release.ipa Payload
 
       - name: Upload IPA
